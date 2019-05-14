@@ -20,11 +20,11 @@ f_prep_data <- function(filebase){
     mutate(date_2_week = round_date(date, "2 weeks"))
   return(test)
 }
-test <- f_prep_data("mcmc_banana_AdaptiveCovarianceMCMC_1")
 ```
 
-Visualise
+# Visualise banana example
 ```{r}
+test <- f_prep_data("mcmc_banana_AdaptiveCovarianceMCMC_1")
 test %>% 
   ggplot(aes(x=date_2_week, y=kld, group=as.factor(date_2_week))) +
   geom_boxplot(outlier.shape = NA) +
@@ -37,5 +37,54 @@ Fit change point model to data
 library(changepoint)
 model  <- cpt.mean(test$kld)
 plot(model)
+```
+
+# Visualise normal DE MCMC
+```{r}
+test <- f_prep_data("mcmc_normal_DifferentialEvolutionMCMC_3")
+test %>% 
+  ggplot(aes(x=date_2_week, y=kld, group=as.factor(date_2_week))) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(alpha=0.4) +
+  theme_classic()
+```
+```{r}
+model  <- cpt.mean(test$kld,method = "PELT", minseglen = 10)
+plot(model)
+summary(model)
+```
+# normal population MCMC
+```{r}
+test <- f_prep_data("mcmc_normal_PopulationMCMC_1")
+test %>% 
+  ggplot(aes(x=date_2_week, y=kld, group=as.factor(date_2_week))) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(alpha=0.4) +
+  theme_classic()
+```
+
+```{r}
+model  <- cpt.mean(test$kld,method = "PELT", minseglen = 10)
+plot(model)
+summary(model)
+```
+
+# Optimiser results
+```{r}
+test <- f_prep_data("opt_fn_SNES")
+test %>% 
+  ggplot(aes(x=date_2_week, y=kld, group=as.factor(date_2_week))) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(alpha=0.4) +
+  theme_classic() +
+  scale_y_log10()
+
+hist(log(test$kld))
+```
+
+```{r}
+model  <- cpt.mean(test$kld,method = "PELT", minseglen = 100)
+plot(model)
+summary(model)
 ```
 
