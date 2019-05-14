@@ -1,0 +1,41 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+rm(list=ls())
+library(tidyverse)
+library(lubridate)
+```
+
+```{r}
+f_prep_data <- function(filebase){
+  test <- read.csv(paste0("../cleaned/", filebase, ".csv"), header = F)
+  colnames(test) <- c("year", "month", "day", "hour", "minute", "second", "kld")
+  test <- test %>%
+    mutate(date=make_date(year, month, day)) %>% 
+    mutate(week=week(date)) %>% 
+    mutate(date_week=cut(date, "week")) %>% 
+    mutate(date_2_week = round_date(date, "2 weeks"))
+  return(test)
+}
+test <- f_prep_data("mcmc_banana_AdaptiveCovarianceMCMC_1")
+```
+
+Visualise
+```{r}
+test %>% 
+  ggplot(aes(x=date_2_week, y=kld, group=as.factor(date_2_week))) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(alpha=0.4) +
+  theme_classic()
+```
+
+Fit change point model to data
+```{r}
+library(changepoint)
+model  <- cpt.mean(test$kld)
+plot(model)
+```
+
