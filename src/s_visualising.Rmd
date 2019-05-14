@@ -26,10 +26,11 @@ f_prep_data <- function(filebase){
 ```{r}
 test <- f_prep_data("mcmc_banana_AdaptiveCovarianceMCMC_1")
 test %>% 
-  ggplot(aes(x=date_2_week, y=kld, group=as.factor(date_2_week))) +
-  geom_boxplot(outlier.shape = NA) +
+  ggplot(aes(x=date_2_week, y=kld)) +
+  geom_boxplot(aes(group=as.factor(date_2_week)), outlier.shape = NA) +
   geom_jitter(alpha=0.4) +
-  theme_classic()
+  theme_classic() +
+  geom_smooth()
 ```
 
 Fit change point model to data
@@ -57,10 +58,11 @@ summary(model)
 ```{r}
 test <- f_prep_data("mcmc_normal_PopulationMCMC_1")
 test %>% 
-  ggplot(aes(x=date_2_week, y=kld, group=as.factor(date_2_week))) +
-  geom_boxplot(outlier.shape = NA) +
+  ggplot(aes(x=date_2_week, y=kld)) +
+  geom_boxplot(aes(group=as.factor(date_2_week)), outlier.shape = NA) +
   geom_jitter(alpha=0.4) +
-  theme_classic()
+  theme_classic()  +
+  geom_smooth(colour="blue")
 ```
 
 ```{r}
@@ -69,17 +71,41 @@ plot(model)
 summary(model)
 ```
 
+HMC
+```{r}
+test <- f_prep_data("mcmc_normal_HamiltonianMCMC_1")
+
+test %>% 
+  ggplot(aes(x=date_2_week, y=kld)) +
+  geom_boxplot(aes(group=as.factor(date_2_week)), outlier.shape = NA) +
+  geom_jitter(alpha=0.4) +
+  theme_classic() +
+  scale_y_log10() +
+  geom_smooth(colour="blue")
+```
+
+```{r}
+model  <- cpt.mean(test$kld,method = "PELT")
+plot(model)
+summary(model)
+```
+
+
 # Optimiser results
 ```{r}
 test <- f_prep_data("opt_fn_SNES")
+
+library(zoo)
+test$kld_mean <- rollmean(test$kld, 20, fill = list(NA, NULL, NA))
+
+
 test %>% 
-  ggplot(aes(x=date_2_week, y=kld, group=as.factor(date_2_week))) +
-  geom_boxplot(outlier.shape = NA) +
+  ggplot(aes(x=date_2_week, y=kld)) +
+  geom_boxplot(aes(group=as.factor(date_2_week)), outlier.shape = NA) +
   geom_jitter(alpha=0.4) +
   theme_classic() +
-  scale_y_log10()
-
-hist(log(test$kld))
+  scale_y_log10() +
+  geom_smooth(colour="blue")
 ```
 
 ```{r}
@@ -88,3 +114,37 @@ plot(model)
 summary(model)
 ```
 
+```{r}
+test <- f_prep_data("opt_fn_XNES")
+
+test %>% 
+  ggplot(aes(x=date_2_week, y=kld)) +
+  geom_boxplot(aes(group=as.factor(date_2_week)), outlier.shape = NA) +
+  geom_jitter(alpha=0.4) +
+  theme_classic() +
+  scale_y_log10() +
+  geom_smooth(colour="blue")
+```
+```{r}
+model  <- cpt.mean(test$kld,method = "PELT", minseglen = 100)
+plot(model)
+summary(model)
+```
+
+```{r}
+test <- f_prep_data("opt_logistic_SNES")
+
+test %>% 
+  ggplot(aes(x=date_2_week, y=kld)) +
+  geom_boxplot(aes(group=as.factor(date_2_week)), outlier.shape = NA) +
+  geom_jitter(alpha=0.4) +
+  theme_classic() +
+  scale_y_log10() +
+  geom_smooth(colour="blue")
+```
+
+```{r}
+model  <- cpt.mean(test$kld,method = "PELT", minseglen = 100)
+plot(model)
+summary(model)
+```
