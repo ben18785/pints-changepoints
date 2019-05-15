@@ -1,0 +1,153 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+rm(list=ls())
+library(tidyverse)
+library(lubridate)
+library(Hmisc)
+library(changepoint)
+```
+
+```{r}
+f_prep_data <- function(filebase){
+  test <- read.csv(paste0("../cleaned/", filebase, ".csv"), header = F)
+  colnames(test) <- c("year", "month", "day", "hour", "minute", "second", "commit", "score")
+  test <- test %>%
+    mutate(date_time=make_datetime(year, month, day, hour, minute, second)) %>% 
+    mutate(date=make_date(year, month, day)) %>% 
+    mutate(week=week(date)) %>% 
+    mutate(date_week=cut(date, "week")) %>% 
+    mutate(date_2_week = round_date(date, "2 weeks"))
+  return(test)
+}
+```
+
+
+# MCMC plots (tend to be less bimodal)
+```{r}
+test <- f_prep_data("mcmc_normal_HamiltonianMCMC_1")
+
+model  <- cpt.mean(test$score, method = "PELT", minseglen = 10)
+plot(model)
+cpts <- as.vector(model@cpts)
+if(length(cpts) > 1){
+  cpts <- cpts[-length(cpts)]
+  means <- model@param.est$mean
+  vMeans <- vector(length = nrow(test))
+  ncpts <- length(cpts)
+  for(i in 1:(ncpts + 1)){
+    print(i)
+    if(i < (ncpts + 1))
+      current_cpt <- cpts[i]
+    
+    if(i == 1){
+      vMeans[1:current_cpt] <- rep(means[i], current_cpt)
+    }else if(i < (ncpts + 1)){
+      diff <- current_cpt - prev_cpt
+      vMeans[(prev_cpt + 1):(prev_cpt + diff)] <- rep(means[i], diff)
+    }else{
+      vMeans[(prev_cpt + 1):length(vMeans)] <- rep(means[i], length(vMeans) - prev_cpt)
+    }
+    prev_cpt <- current_cpt
+  }
+}
+
+test$cpt_means <- vMeans
+p <-
+  test %>% 
+  ggplot(aes(x=date_2_week, y=score)) +
+  geom_jitter() +
+  theme_classic() +
+  stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") +
+  xlab("Date, two weeks grouped") +
+  ylab("Score") +
+  theme(axis.title = element_text(size=14, colour="black"),
+        axis.text = element_text(size=14, colour="black")) +
+  geom_line(aes(y=cpt_means), linetype=2, colour="blue", size=1)
+p +
+  scale_y_log10() +
+  geom_smooth(linetype=3, colour="orange")
+
+```
+
+# Optimiser plots tend to either fail or not
+```{r}
+test <- f_prep_data("opt_fn_XNES")
+
+model  <- cpt.mean(test$score, method = "PELT", minseglen = 100)
+plot(model)
+cpts <- as.vector(model@cpts)
+if(length(cpts) > 1){
+  cpts <- cpts[-length(cpts)]
+  means <- model@param.est$mean
+  vMeans <- vector(length = nrow(test))
+  ncpts <- length(cpts)
+  for(i in 1:(ncpts + 1)){
+    print(i)
+    if(i < (ncpts + 1))
+      current_cpt <- cpts[i]
+    
+    if(i == 1){
+      vMeans[1:current_cpt] <- rep(means[i], current_cpt)
+    }else if(i < (ncpts + 1)){
+      diff <- current_cpt - prev_cpt
+      vMeans[(prev_cpt + 1):(prev_cpt + diff)] <- rep(means[i], diff)
+    }else{
+      vMeans[(prev_cpt + 1):length(vMeans)] <- rep(means[i], length(vMeans) - prev_cpt)
+    }
+    prev_cpt <- current_cpt
+  }
+}
+
+test$cpt_means <- vMeans
+p <-
+  test %>% 
+  ggplot(aes(x=date_2_week, y=score)) +
+  geom_jitter() +
+  theme_classic() +
+  stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red") +
+  xlab("Date, two weeks grouped") +
+  ylab("Score") +
+  theme(axis.title = element_text(size=14, colour="black"),
+        axis.text = element_text(size=14, colour="black")) +
+  geom_line(aes(y=cpt_means), linetype=2, colour="blue", size=1)
+p +
+  scale_y_log10() +
+  geom_smooth(linetype=3, colour="orange")
+```
+
+Plotting proportion passing
+```{r}
+test <- f_prep_data("opt_fn_XNES")
+a_threshold <- 4
+test <- test %>% 
+  mutate(pass=if_else(score < a_threshold, 1, 0)) %>% 
+  group_by(date_2_week) %>% 
+  summarise(pass=sum(pass),
+            size=n()) %>% 
+  mutate(score=pass / size,
+         upper=qbeta(0.95, 1 + pass, 1 + size - pass),
+         lower=qbeta(0.05, 1 + pass, 1 + size - pass),
+         middle=qbeta(0.5, 1 + pass, 1 + size - pass))
+  
+  
+test %>% 
+  ggplot(aes(x=date_2_week, y=score)) +
+  theme_classic() +
+  xlab("Date, two weeks grouped") +
+  ylab("Mean passing threshold") +
+  theme(axis.title = element_text(size=14, colour="black"),
+        axis.text = element_text(size=14, colour="black")) +
+  geom_point() +
+  geom_point(aes(y=middle), colour="red") + 
+  geom_errorbar(aes(ymin=lower, ymax=upper), size=0.1, colour="red") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  geom_smooth()
+  
+```
+

@@ -7,13 +7,15 @@ output: html_notebook
 rm(list=ls())
 library(tidyverse)
 library(lubridate)
+library(Hmisc)
 ```
 
 ```{r}
 f_prep_data <- function(filebase){
   test <- read.csv(paste0("../cleaned/", filebase, ".csv"), header = F)
-  colnames(test) <- c("year", "month", "day", "hour", "minute", "second", "kld")
+  colnames(test) <- c("year", "month", "day", "hour", "minute", "second", "commit", "score")
   test <- test %>%
+    mutate(date_time=make_datetime(year, month, day, hour, minute, second)) %>% 
     mutate(date=make_date(year, month, day)) %>% 
     mutate(week=week(date)) %>% 
     mutate(date_week=cut(date, "week")) %>% 
@@ -26,18 +28,28 @@ f_prep_data <- function(filebase){
 ```{r}
 test <- f_prep_data("mcmc_banana_AdaptiveCovarianceMCMC_1")
 test %>% 
-  ggplot(aes(x=date_2_week, y=kld)) +
-  geom_boxplot(aes(group=as.factor(date_2_week)), outlier.shape = NA) +
-  geom_jitter(alpha=0.4) +
+  ggplot(aes(x=date_2_week, y=score)) +
+  geom_jitter() +
   theme_classic() +
-  geom_smooth()
+  geom_smooth() +
+  stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red")
 ```
+
+```{r}
+test %>% 
+  ggplot(aes(x=date_time, y=kld)) +
+  geom_line()
+```
+
+
 
 Fit change point model to data
 ```{r}
 library(changepoint)
-model  <- cpt.mean(test$kld)
+model  <- cpt.mean(test$score)
 plot(model)
+model@param.est
 ```
 
 # Visualise normal DE MCMC
@@ -76,7 +88,7 @@ HMC
 test <- f_prep_data("mcmc_normal_HamiltonianMCMC_1")
 
 test %>% 
-  ggplot(aes(x=date_2_week, y=kld)) +
+  ggplot(aes(x=date_2_week, y=score)) +
   geom_boxplot(aes(group=as.factor(date_2_week)), outlier.shape = NA) +
   geom_jitter(alpha=0.4) +
   theme_classic() +
@@ -96,11 +108,11 @@ summary(model)
 test <- f_prep_data("opt_fn_SNES")
 
 library(zoo)
-test$kld_mean <- rollmean(test$kld, 20, fill = list(NA, NULL, NA))
+test$kld_mean <- rollmean(test$score, 20, fill = list(NA, NULL, NA))
 
 
 test %>% 
-  ggplot(aes(x=date_2_week, y=kld)) +
+  ggplot(aes(x=date_2_week, y=score)) +
   geom_boxplot(aes(group=as.factor(date_2_week)), outlier.shape = NA) +
   geom_jitter(alpha=0.4) +
   theme_classic() +
@@ -119,14 +131,15 @@ test <- f_prep_data("opt_fn_XNES")
 
 test %>% 
   ggplot(aes(x=date_2_week, y=kld)) +
-  geom_boxplot(aes(group=as.factor(date_2_week)), outlier.shape = NA) +
   geom_jitter(alpha=0.4) +
   theme_classic() +
   scale_y_log10() +
-  geom_smooth(colour="blue")
+  geom_smooth(colour="blue") +
+  stat_summary(fun.data=mean_sdl, mult=1, 
+                 geom="pointrange", color="red")
 ```
 ```{r}
-model  <- cpt.mean(test$kld,method = "PELT", minseglen = 100)
+model  <- cpt.mean(test$kld,method = "PELT", minseglen = 120)
 plot(model)
 summary(model)
 ```
@@ -142,6 +155,17 @@ test %>%
   scale_y_log10() +
   geom_smooth(colour="blue")
 ```
+
+```{r}
+test %>% 
+  ggplot(aes(x=date_2_week, y=kld)) +
+  geom_line() +
+  theme_classic() +
+  scale_y_log10() +
+  geom_smooth(colour="blue")
+```
+
+
 
 ```{r}
 model  <- cpt.mean(test$kld,method = "PELT", minseglen = 100)
