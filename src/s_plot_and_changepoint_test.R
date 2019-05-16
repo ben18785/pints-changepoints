@@ -17,8 +17,7 @@ plot_raw_changepoints <- as.numeric(args[7])
 plot_smooth <- as.numeric(args[8])
 plot_pass_threshold <- as.numeric(args[9])
 changepoints_run_length <- as.numeric(args[10])
-changepoints_near_end_threshold <- as.numeric(args[11])
-changepoints_num_tests_commits <- as.numeric(args[12])
+changepoints_num_tests_commits <- as.numeric(args[11])
 
 setwd(current_directory)
 
@@ -64,31 +63,33 @@ if(length(cpts) > 1){
   vMeans <- rep(model@param.est$mean, nrow(test))
 }
 
-# check if a changepoint has occurred between [changepoints_near_end_threshold tests ago, most recent commit]
-print(changepoints_near_end_threshold)
-cpt_alarm_triggered <- if_else(max(cpts) > (nrow(test) - changepoints_near_end_threshold), 1, 0)
-if(cpt_alarm_triggered == 1){
-  max_cpt <- max(cpts)
-  cpt_date <- test$date[max_cpt]
-  cpt_week <- test$week[max_cpt]
-  cpt_main_commit <- as.character(test$commit[max_cpt])
+
+num_cpts <- length(cpts)
+cpt_dates <- vector(mode="list", length = num_cpts)
+cpt_weeks <- vector(mode="list", length = num_cpts)
+cpt_main_commits <- vector(mode="list", length = num_cpts)
+cpt_commits <- vector(mode="list", length = num_cpts)
+for (i in 1:num_cpts){
+  a_cpt <- cpts[i]
+  cpt_dates[[i]] <- test$date[a_cpt]
+  cpt_weeks[[i]] <- test$week[a_cpt]
+  cpt_main_commit[[i]] <- as.character(test$commit[cpts[[i]]])
   # get last changepoints_num_tests_commits test commits
-  a_min <- if_else((max_cpt - changepoints_num_tests_commits) > 1,
-                   max_cpt - changepoints_num_tests_commits, 1)
-  a_max <- if_else((max_cpt + changepoints_num_tests_commits) < nrow(test),
-                   max_cpt + changepoints_num_tests_commits, as.numeric(nrow(test)))
-  cpt_commits <- as.character(unique(test$commit[a_min:a_max]))
-}else{
-  cpt_date <- -99
-  cpt_week <- -99
-  cpt_main_commit <- -99
-  cpt_commits <- -99
+  a_min <- if_else((a_cpt - changepoints_num_tests_commits) > 1,
+                   a_cpt - changepoints_num_tests_commits, 1)
+  a_max <- if_else((a_cpt + changepoints_num_tests_commits) < nrow(test),
+                   a_cpt + changepoints_num_tests_commits, as.numeric(nrow(test)))
+  cpt_commits[[i]] <- as.character(unique(test$commit[a_min:a_max]))
 }
-commit_list <- list(cpt_alarm_triggered=cpt_alarm_triggered,
-                    cpt_date=cpt_date,
-                    cpt_week=cpt_week,
-                    cpt_main_commit=cpt_main_commit,
-                    cpt_commits=cpt_commits)
+
+output_list <- list()
+for(i in 1:num_cpts){
+  output_list[[i]] <- list(changepoint=cpts[i],
+                           date=cpt_dates[[i]],
+                           week=cpt_weeks[[i]],
+                           commit_main=cpt_main_commits[[i]],
+                           commits_nearby=cpt_commits[[i]])
+}
 
 test$cpt_means <- vMeans
 
@@ -151,7 +152,7 @@ if(plot_smooth){
 }
 
 # Output changepoint test results as json to directory -------
-exportJson <- toJSON(commit_list)
+exportJson <- toJSON(output_list)
 write(exportJson, paste0(output_directory, "/", output_filename_base, ".json"))
 
 # output plot
