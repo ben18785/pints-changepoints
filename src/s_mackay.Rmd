@@ -1,0 +1,94 @@
+---
+title: "MacKay Bayesian changepoint analysis"
+output: html_notebook
+---
+
+```{r}
+rm(list=ls())
+library(tidyverse)
+library(lubridate)
+```
+
+
+```{r}
+f_prep_data <- function(filebase){
+  test <- read.csv(paste0("../cleaned/", filebase, ".csv"), header = F)
+  colnames(test) <- c("year", "month", "day", "hour", "minute", "second", "commit", "score")
+  test <- test %>%
+    mutate(date_time=make_datetime(year, month, day, hour, minute, second)) %>% 
+    mutate(date=make_date(year, month, day)) %>% 
+    mutate(week=week(date)) %>% 
+    mutate(date_week=cut(date, "week")) %>% 
+    mutate(date_2_week = round_date(date, "2 weeks"))
+  return(test)
+}
+```
+
+
+```{r}
+test <- f_prep_data("opt_fn_XNES")
+a_threshold <- 4
+test <- test %>% 
+  mutate(pass=if_else(score < a_threshold, 1, 0)) %>% 
+  group_by(date_2_week) %>% 
+  summarise(pass=sum(pass),
+            size=n()) %>% 
+  mutate(score=pass / size,
+         upper=qbeta(0.95, 1 + pass, 1 + size - pass),
+         lower=qbeta(0.05, 1 + pass, 1 + size - pass),
+         middle=qbeta(0.5, 1 + pass, 1 + size - pass))
+```
+
+Posterior predictive functions
+```{r}
+f_update_posterior_parameters <- function(x, n, alpha, beta){
+  return(list(alpha=alpha + x, beta=beta + n - x))
+}
+
+dbetabinom <- function(x, size, alpha, beta, log=FALSE){
+  if(!log)
+    return(choose(size, x) * beta(x + alpha, size - x + beta) / beta(alpha, beta))
+  else
+    return(log(choose(size, x) * beta(x + alpha, size - x + beta) / beta(alpha, beta)))
+}
+
+f_predictive_probability <- function(x, n, alpha, beta){
+  return(dbetabinom(x, n, alpha, beta))
+}
+```
+
+Hazard function
+```{r}
+f_hazard_geometric <- function(lambda){
+  return(1 / lambda)
+}
+
+f_update_growth_probability <- function(p_previous, p_predictive, lambda){
+  return(p_previous * p_predictive * (1 - f_hazard_geometric(lambda)))
+}
+```
+
+Changepoint probabilities
+```{r}
+f_changepoint_probability <- function(l_p_previous, l_p_predictive, lambda){
+  return(sum(l_p_previous * l_p_predictive * f_hazard_geometric(lambda)))
+}
+
+f_calculate_evidence <- function(p_changepoint, l_p_growth){
+  return(sum(l_p_growth) + p_changepoint)
+}
+
+f_run_length_distribution <- function(p_changepoint, l_p_growth){
+  z <- f_calculate_evidence(p_changepoint, l_p_growth)
+  return(c(p_changepoint, l_p_growth) / z)
+}
+```
+
+Putting it all together
+```{r}
+f_calculate_all_predictive <- function(x, n, l_alpha, l_beta){
+  l_p_predictive <- vector(length = rmax)
+  
+}
+```
+
